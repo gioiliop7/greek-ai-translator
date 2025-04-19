@@ -1,0 +1,15 @@
+export interface Window {
+  SpeechRecognition: typeof SpeechRecognition;
+  webkitSpeechRecognition: typeof SpeechRecognition;
+  SpeechGrammarList: typeof SpeechGrammarList;
+  webkitSpeechGrammarList: typeof SpeechGrammarList;
+  SpeechRecognitionEvent: typeof SpeechRecognitionEvent;
+}
+
+export interface TranslationHistoryItem {
+  input: string;
+  output: string;
+  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα"; // Store as readable string
+  provider: "Ollama" | "Gemini"; // Store as readable string
+  timestamp: number; // Added timestamp
+}

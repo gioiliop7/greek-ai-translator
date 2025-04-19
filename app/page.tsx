@@ -17,15 +17,9 @@ import {
   Mic, // For voice input
   MessageCircle, // For feedback (placeholder)
 } from "lucide-react";
+import { Window, TranslationHistoryItem } from "@/helpers/types";
 
 // Type for history
-interface TranslationHistoryItem {
-  input: string;
-  output: string;
-  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα"; // Store as readable string
-  provider: "Ollama" | "Gemini"; // Store as readable string
-  timestamp: number; // Added timestamp
-}
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -93,12 +87,15 @@ export default function Home() {
   }, [isProduction, provider]); // Checks when environment or provider changes
 
   // 3. Speech-to-Text (Voice Input)
+  // --- 3. Speech-to-Text (Voice Input) ---
   useEffect(() => {
     // Check for Web Speech API support
     // Accessing SpeechRecognition via window requires checking if window is defined (for SSR safety)
-
     const SpeechRecognition =
-      typeof window !== "undefined" ? window.SpeechRecognition : undefined;
+      typeof window !== "undefined"
+        ? (window as unknown as Window).SpeechRecognition ||
+          (window as unknown as Window).webkitSpeechRecognition
+        : undefined;
 
     if (SpeechRecognition) {
       setIsSpeechApiSupported(true);
@@ -133,7 +130,7 @@ export default function Home() {
             );
           }
           // You could potentially display interimTranscript somewhere else, e.g., a temporary status area
-          console.log("Interim:", interimTranscript);
+          // console.log("Interim:", interimTranscript);
         };
 
         // Specify event type
@@ -386,6 +383,7 @@ export default function Home() {
         ...prev.slice(0, 9), // Keep only last 10 translations
       ]);
     } catch (err: unknown) {
+      // Use unknown for catch error
       console.error("General translation error:", err);
       // Safely access error message based on type
       if (err instanceof Error) {
@@ -398,6 +396,7 @@ export default function Home() {
       setTranslated("");
     } finally {
       setLoading(false);
+      // Cleanup is handled by the useEffect cleanup function for SpeechRecognition
     }
   };
 
