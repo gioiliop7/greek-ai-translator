@@ -133,7 +133,7 @@ export default function Home() {
             );
           }
           // You could potentially display interimTranscript somewhere else, e.g., a temporary status area
-          // console.log("Interim:", interimTranscript);
+          console.log("Interim:", interimTranscript);
         };
 
         // Specify event type
