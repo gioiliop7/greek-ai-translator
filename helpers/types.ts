@@ -9,6 +9,6 @@ export interface TranslationHistoryItem {
   input: string;
   output: string;
   direction: "Νέα → Αρχαία" | "Αρχαία → Νέα";
-  provider: "Ollama" | "Gemini" | "DeepSeek";
+  provider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT";
   timestamp: number;
 }
