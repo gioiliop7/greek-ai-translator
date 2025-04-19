@@ -42,7 +42,6 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [characterCount, setCharacterCount] = useState(0);
   const [copyTooltip, setCopyTooltip] = useState(false);
-  const [isShareApiSupported, setIsShareApiSupported] = useState(false);
   const [isSpeechApiSupported, setIsSpeechApiSupported] = useState(false); // <-- New state for voice
   const [isListening, setIsListening] = useState(false); // <-- New state for listening status
   const recognitionRef = useRef<SpeechRecognition | null>(null); // <-- Ref for SpeechRecognition API
@@ -82,14 +81,6 @@ export default function Home() {
     setCharacterCount(text.length);
   }, [text]);
 
-  // Check for Share API support
-  useEffect(() => {
-    //@ts-expect-error Navigator always must be true
-    if (typeof navigator !== "undefined" && navigator.share) {
-      setIsShareApiSupported(true);
-    }
-  }, []);
-
   // 6. Disable Ollama in Production
   const isProduction = process.env.NODE_ENV === "production";
   useEffect(() => {
@@ -104,63 +95,81 @@ export default function Home() {
   // 3. Speech-to-Text (Voice Input)
   useEffect(() => {
     // Check for Web Speech API support
+    // Accessing SpeechRecognition via window requires checking if window is defined (for SSR safety)
+
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      typeof window !== "undefined" ? window.SpeechRecognition : undefined;
+
     if (SpeechRecognition) {
       setIsSpeechApiSupported(true);
-      // Initialize SpeechRecognition (may need additional settings)
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Continuous recognition (optional)
-      recognition.interimResults = true; // Interim results (optional)
-      recognition.lang = "el-GR"; // Recognition language (Greek)
+      try {
+        // Initialize SpeechRecognition - Specify the type
+        const recognition: SpeechRecognition = new SpeechRecognition();
+        recognition.continuous = false; // Changed to false for single utterance recognition on button press
+        recognition.interimResults = true; // Keep interim results for potentially showing live text
+        recognition.lang = "el-GR"; // Recognition language (Greek)
 
-      recognition.onresult = (event: any) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
+        // Specify event type
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = "";
+          let finalTranscript = "";
+          // Loop through results to separate final and interim
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              finalTranscript += result[0].transcript;
+            } else {
+              interimTranscript += result[0].transcript;
+            }
           }
-        }
-        // Update input field with recognized text
-        // You can choose to add only finalTranscript
-        // or interimTranscript for more immediate display
-        // For simplicity, let's add finalTranscript to input
-        setText((prevText) => prevText + finalTranscript); // Add to the end
+          // Append *final* recognized text to the input field
+          if (finalTranscript.trim()) {
+            // Add a space before appending if the input text is not empty
+            setText(
+              (prevText) =>
+                prevText +
+                (prevText.endsWith(" ") || prevText.length === 0 ? "" : " ") +
+                finalTranscript
+            );
+          }
+          // You could potentially display interimTranscript somewhere else, e.g., a temporary status area
+          // console.log("Interim:", interimTranscript);
+        };
 
-        // If you want to display interim text elsewhere...
-        // console.log("Interim:", interimTranscript);
-      };
+        // Specify event type
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error("Speech recognition error:", event.error);
+          setIsListening(false); // Stop listening state in case of error
+          // event.error contains the error type string (e.g., 'not-allowed', 'no-speech')
+          setError(`Σφάλμα φωνητικής αναγνώρισης: ${event.error}`);
+        };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false); // Stop listening state in case of error
-        setError(`Speech recognition error: ${event.error}`);
-      };
+        recognition.onend = () => {
+          // This is called when recognition stops (manually or automatically)
+          setIsListening(false);
+          console.log("Speech recognition ended.");
+        };
 
-      recognition.onend = () => {
-        // This is called when recognition stops
-        setIsListening(false);
-        console.log("Speech recognition ended.");
-      };
-
-      recognitionRef.current = recognition; // Store instance in ref
+        recognitionRef.current = recognition; // Store instance in ref
+      } catch (e) {
+        console.error("Error initializing SpeechRecognition:", e);
+        setIsSpeechApiSupported(false); // If initialization itself fails
+      }
     } else {
       setIsSpeechApiSupported(false);
       console.warn("Web Speech API not supported in this browser.");
     }
 
-    // Cleanup function to stop recognition if component unmounts
+    // Cleanup function to stop recognition if component unmounts or effect re-runs (though dependency array is empty)
     return () => {
-      if (recognitionRef.current && isListening) {
+      // Use the ref directly in cleanup
+      if (recognitionRef.current) {
         recognitionRef.current.stop();
-        setIsListening(false);
+        // Avoid setting state in cleanup if not absolutely necessary,
+        // onend will handle setIsListening(false)
       }
     };
-  }, []); // Runs only once to initialize API
+  }, []); // Empty dependency array ensures this runs only once
 
   const toggleListening = () => {
     if (!isSpeechApiSupported) {
@@ -376,9 +385,16 @@ export default function Home() {
         },
         ...prev.slice(0, 9), // Keep only last 10 translations
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("General translation error:", err);
-      setError(err.message || "An unknown error occurred.");
+      // Safely access error message based on type
+      if (err instanceof Error) {
+        setError(err.message || "An unknown error occurred.");
+      } else if (typeof err === "string") {
+        setError(err);
+      } else {
+        setError("An unknown error occurred.");
+      }
       setTranslated("");
     } finally {
       setLoading(false);
@@ -408,27 +424,6 @@ export default function Home() {
     // Optional: stop listening if active
     if (isListening) {
       toggleListening();
-    }
-  };
-
-  // Share functionality (remains the same)
-  const shareTranslation = async () => {
-    if (!translated) return;
-
-    if (isShareApiSupported) {
-      try {
-        await navigator.share({
-          title: "Ancient/Modern Greek Translation",
-          text: translated,
-          url: window.location.href,
-        });
-        console.log("Translation shared successfully");
-      } catch (shareError: any) {
-        console.error("Error sharing translation:", shareError);
-      }
-    } else {
-      console.warn("Web Share API not supported.");
-      setError("Sharing is not supported in this browser."); // Inform user
     }
   };
 
@@ -546,7 +541,7 @@ export default function Home() {
       >
         <div className="flex justify-between items-center">
           <h1 className="text-4xl font-extrabold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-500">
-            Greek AI Translator
+            Lexi AI
           </h1>
 
           {/* Top Action Buttons */}

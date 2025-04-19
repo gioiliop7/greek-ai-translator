@@ -47,8 +47,9 @@ export async function POST(req: Request) {
         "Content-Type": "text/plain; charset=utf-8",
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error calling Ollama API:", error);
+
     if (error instanceof Error) {
       if (
         error.message.includes("fetch failed") ||
@@ -67,9 +68,12 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-    return NextResponse.json(
-      { error: "Translation request failed due to an unknown error" },
-      { status: 500 }
-    );
+
+    let errorMessage = "Translation request failed due to an unknown error";
+    if (typeof error === "string") {
+      errorMessage = `Translation request failed: ${error}`;
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

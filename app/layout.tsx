@@ -11,8 +11,8 @@ const syne = Syne({
 // Generate more complete metadata
 export const metadata: Metadata = {
   title: {
-    default: "Greek AI Translator", // Default title
-    template: "%s | Greek AI Translator", // Template for page-specific titles
+    default: "Lexi AI", // Default title
+    template: "%s | Lexi AI", // Template for page-specific titles
   },
   applicationName: "Greek AI Translator App", // Name of the application
   description:
@@ -37,9 +37,9 @@ export const metadata: Metadata = {
 
   // Open Graph metadata (for social media sharing)
   openGraph: {
-    title: "Greek AI Translator",
+    title: "Lexi AI",
     description: "Powerful AI Translator for Ancient and Modern Greek.",
-    siteName: "Greek AI Translator",
+    siteName: "Lexi AI",
     locale: "en_US", // Or 'el_GR'
     type: "website",
   },
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   // Twitter Card metadata (for Twitter sharing)
   twitter: {
     card: "summary_large_image", // or 'summary'
-    title: "Greek AI Translator",
+    title: "Lexi AI",
     description: "Powerful AI Translator for Ancient and Modern Greek.",
   },
 

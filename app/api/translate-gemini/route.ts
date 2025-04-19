@@ -65,11 +65,17 @@ export async function POST(req: Request) {
         "Content-Type": "text/plain; charset=utf-8",
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Error calling Gemini API:", e);
-    return NextResponse.json(
-      { error: `Error from Gemini API: ${e.message || e}` },
-      { status: 500 }
-    );
+
+    let errorMessage = "An unknown error occurred calling Gemini API";
+
+    if (e instanceof Error) {
+      errorMessage = `Error from Gemini API: ${e.message}`;
+    } else if (typeof e === "string") {
+      errorMessage = `Error from Gemini API: ${e}`;
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
