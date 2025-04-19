@@ -88,6 +88,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (e) {
+        console.log(e)
         // Ignore JSON parsing error if the body is not valid JSON
       }
 
