@@ -19,8 +19,6 @@ import {
 } from "lucide-react";
 import { Window, TranslationHistoryItem } from "@/helpers/types";
 
-// Type for history
-
 export default function Home() {
   const [text, setText] = useState("");
   const [translated, setTranslated] = useState("");
