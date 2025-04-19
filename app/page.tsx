@@ -652,7 +652,11 @@ export default function Home() {
                   size={20}
                 />
                 <span>ChatGPT</span> {/* <-- Label text */}
-                <span className="ml-2 px-2 py-1 bg-green-900/30 text-xs rounded-full text-green-300">
+                <span
+                  className={`ml-2 px-2 py-1 text-xs rounded-full text-green-300 ${
+                    darkMode ? "bg-green-900" : "bg-green-900/30"
+                  }`}
+                >
                   Cloud
                 </span>
               </label>
@@ -683,7 +687,11 @@ export default function Home() {
                   size={20}
                 />
                 <span>Ollama</span>
-                <span className="ml-2 px-2 py-1 bg-blue-900/30 text-xs rounded-full text-blue-300">
+                <span
+                  className={`ml-2 px-2 py-1 text-xs rounded-full text-blue-300 ${
+                    darkMode ? "bg-blue-900" : "bg-blue-900/30"
+                  }`}
+                >
                   Local
                 </span>
                 {/* <-- Text cue */}
@@ -713,7 +721,11 @@ export default function Home() {
                   size={20}
                 />
                 <span>Gemini AI</span>
-                <span className="ml-2 px-2 py-1 bg-violet-900/30 text-xs rounded-full text-violet-300">
+                <span
+                  className={`ml-2 px-2 py-1 text-xs rounded-full text-violet-300 ${
+                    darkMode ? "bg-violet-900" : "bg-violet-900/30"
+                  }`}
+                >
                   Cloud
                 </span>
               </label>
@@ -742,7 +754,11 @@ export default function Home() {
                   size={20}
                 />
                 <span>DeepSeek AI</span> {/* <-- New label text */}
-                <span className="ml-2 px-2 py-1 bg-cyan-900/30 text-xs rounded-full text-cyan-300">
+                <span
+                  className={`ml-2 px-2 py-1  text-xs rounded-full text-cyan-300 ${
+                    darkMode ? "bg-cyan-900" : "bg-cyan-900/30"
+                  }`}
+                >
                   Cloud
                 </span>
               </label>
