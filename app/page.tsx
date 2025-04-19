@@ -654,7 +654,7 @@ export default function Home() {
                 <span>ChatGPT</span> {/* <-- Label text */}
                 <span
                   className={`ml-2 px-2 py-1 text-xs rounded-full text-green-300 ${
-                    darkMode ? "bg-green-900" : "bg-green-900/30"
+                    darkMode ? "bg-green-700" : "bg-green-900"
                   }`}
                 >
                   Cloud
@@ -689,7 +689,7 @@ export default function Home() {
                 <span>Ollama</span>
                 <span
                   className={`ml-2 px-2 py-1 text-xs rounded-full text-blue-300 ${
-                    darkMode ? "bg-blue-900" : "bg-blue-900/30"
+                    darkMode ? "bg-blue-700" : "bg-blue-900"
                   }`}
                 >
                   Local
@@ -723,7 +723,7 @@ export default function Home() {
                 <span>Gemini AI</span>
                 <span
                   className={`ml-2 px-2 py-1 text-xs rounded-full text-violet-300 ${
-                    darkMode ? "bg-violet-900" : "bg-violet-900/30"
+                    darkMode ? "bg-violet-700" : "bg-violet-900"
                   }`}
                 >
                   Cloud
@@ -756,7 +756,7 @@ export default function Home() {
                 <span>DeepSeek AI</span> {/* <-- New label text */}
                 <span
                   className={`ml-2 px-2 py-1  text-xs rounded-full text-cyan-300 ${
-                    darkMode ? "bg-cyan-900" : "bg-cyan-900/30"
+                    darkMode ? "bg-cyan-700" : "bg-cyan-900"
                   }`}
                 >
                   Cloud
