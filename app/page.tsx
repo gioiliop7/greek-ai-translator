@@ -1,0 +1,1104 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react"; // Added useRef
+import {
+  ArrowRightLeft,
+  Loader2,
+  Cpu,
+  Cloud,
+  History,
+  Check,
+  Sparkles,
+  Moon,
+  Sun,
+  ClipboardCopy, // For copying
+  Download, // For file download
+  X, // For clearing input
+  Mic, // For voice input
+  MessageCircle, // For feedback (placeholder)
+} from "lucide-react";
+
+// Type for history
+interface TranslationHistoryItem {
+  input: string;
+  output: string;
+  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα"; // Store as readable string
+  provider: "Ollama" | "Gemini"; // Store as readable string
+  timestamp: number; // Added timestamp
+}
+
+export default function Home() {
+  const [text, setText] = useState("");
+  const [translated, setTranslated] = useState("");
+  const [direction, setDirection] = useState<
+    "modern-to-ancient" | "ancient-to-modern"
+  >("modern-to-ancient");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [provider, setProvider] = useState<"ollama" | "gemini">("ollama");
+  const [history, setHistory] = useState<TranslationHistoryItem[]>([]); // Using the interface
+  const [showHistory, setShowHistory] = useState(false);
+  const [darkMode, setDarkMode] = useState(true); // Default dark mode
+  const [copied, setCopied] = useState(false);
+  const [characterCount, setCharacterCount] = useState(0);
+  const [copyTooltip, setCopyTooltip] = useState(false);
+  const [isShareApiSupported, setIsShareApiSupported] = useState(false);
+  const [isSpeechApiSupported, setIsSpeechApiSupported] = useState(false); // <-- New state for voice
+  const [isListening, setIsListening] = useState(false); // <-- New state for listening status
+  const recognitionRef = useRef<SpeechRecognition | null>(null); // <-- Ref for SpeechRecognition API
+  const inputTextAreaRef = useRef<HTMLTextAreaElement>(null); // <-- Ref for input textarea (for drag/drop)
+
+  // 1. History with localStorage
+  useEffect(() => {
+    // Load history from localStorage when page loads
+    const savedHistory = localStorage.getItem("translationHistory");
+    if (savedHistory) {
+      try {
+        // Try to parse and set history
+        const parsedHistory = JSON.parse(savedHistory);
+        // Optional check if data is in correct format
+        if (Array.isArray(parsedHistory)) {
+          setHistory(parsedHistory);
+        }
+      } catch (e) {
+        console.error("Failed to load history from localStorage:", e);
+        // You can inform the user or just start with empty history
+      }
+    }
+  }, []); // useEffect runs only once on initial load
+
+  useEffect(() => {
+    // Save history to localStorage whenever it changes
+    try {
+      localStorage.setItem("translationHistory", JSON.stringify(history));
+    } catch (e) {
+      console.error("Failed to save history to localStorage:", e);
+      // Can happen if history becomes too large and exceeds localStorage limit
+    }
+  }, [history]); // This useEffect runs every time history state changes
+
+  // Character Count
+  useEffect(() => {
+    setCharacterCount(text.length);
+  }, [text]);
+
+  // Check for Share API support
+  useEffect(() => {
+    //@ts-expect-error Navigator always must be true
+    if (typeof navigator !== "undefined" && navigator.share) {
+      setIsShareApiSupported(true);
+    }
+  }, []);
+
+  // 6. Disable Ollama in Production
+  const isProduction = process.env.NODE_ENV === "production";
+  useEffect(() => {
+    if (isProduction && provider === "ollama") {
+      // If we're in production and provider is Ollama, switch to Gemini
+      setProvider("gemini");
+      // You can show an alert or message to the user the first time
+      // alert("Ollama model is disabled in production environment.");
+    }
+  }, [isProduction, provider]); // Checks when environment or provider changes
+
+  // 3. Speech-to-Text (Voice Input)
+  useEffect(() => {
+    // Check for Web Speech API support
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setIsSpeechApiSupported(true);
+      // Initialize SpeechRecognition (may need additional settings)
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true; // Continuous recognition (optional)
+      recognition.interimResults = true; // Interim results (optional)
+      recognition.lang = "el-GR"; // Recognition language (Greek)
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        // Update input field with recognized text
+        // You can choose to add only finalTranscript
+        // or interimTranscript for more immediate display
+        // For simplicity, let's add finalTranscript to input
+        setText((prevText) => prevText + finalTranscript); // Add to the end
+
+        // If you want to display interim text elsewhere...
+        // console.log("Interim:", interimTranscript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false); // Stop listening state in case of error
+        setError(`Speech recognition error: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        // This is called when recognition stops
+        setIsListening(false);
+        console.log("Speech recognition ended.");
+      };
+
+      recognitionRef.current = recognition; // Store instance in ref
+    } else {
+      setIsSpeechApiSupported(false);
+      console.warn("Web Speech API not supported in this browser.");
+    }
+
+    // Cleanup function to stop recognition if component unmounts
+    return () => {
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+      }
+    };
+  }, []); // Runs only once to initialize API
+
+  const toggleListening = () => {
+    if (!isSpeechApiSupported) {
+      setError("Voice input is not supported by your browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop(); // Stop recognition
+      setIsListening(false);
+      console.log("Stopped listening.");
+    } else {
+      setError(null); // Clear previous errors
+      // You may need to clear input text if you want new dictation
+      // setText(''); // Optional: clear input before new dictation
+      recognitionRef.current?.start(); // Start recognition
+      setIsListening(true);
+      console.log("Started listening...");
+    }
+  };
+
+  // 10. Drag and Drop (for .txt files)
+  useEffect(() => {
+    const inputArea = inputTextAreaRef.current?.parentElement; // Connect drag/drop to container
+
+    if (inputArea) {
+      const handleDragOver = (e: DragEvent) => {
+        e.preventDefault(); // Prevent default to allow drop
+        // Add visual feedback (optional)
+        inputArea.classList.add(
+          darkMode ? "border-blue-400" : "border-blue-600"
+        );
+        inputArea.classList.add("border-dashed");
+      };
+
+      const handleDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        // Remove visual feedback
+        inputArea.classList.remove(
+          darkMode ? "border-blue-400" : "border-blue-600"
+        );
+        inputArea.classList.remove("border-dashed");
+      };
+
+      const handleDrop = (e: DragEvent) => {
+        e.preventDefault();
+        // Remove visual feedback
+        inputArea.classList.remove(
+          darkMode ? "border-blue-400" : "border-blue-600"
+        );
+        inputArea.classList.remove("border-dashed");
+
+        const files = e.dataTransfer?.files;
+
+        if (files && files.length > 0) {
+          const file = files[0]; // Get first file
+
+          // Check if it's a text file (.txt)
+          if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+            setError(null); // Clear previous errors
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+              const fileContent = event.target?.result as string;
+              setText(fileContent); // Put content in input textarea
+            };
+
+            reader.onerror = (event) => {
+              console.error("Error reading file:", event.target?.error);
+              setError("Error reading file.");
+            };
+
+            reader.readAsText(file); // Read file as text
+          } else {
+            setError("Please upload only text files (.txt).");
+            console.warn(
+              "Dropped file is not a .txt file:",
+              file.type,
+              file.name
+            );
+          }
+        }
+      };
+
+      // Add Event Listeners
+      inputArea.addEventListener("dragover", handleDragOver);
+      inputArea.addEventListener("dragleave", handleDragLeave);
+      inputArea.addEventListener("drop", handleDrop);
+
+      // Cleanup: Remove Event Listeners when component unmounts
+      return () => {
+        inputArea.removeEventListener("dragover", handleDragOver);
+        inputArea.removeEventListener("dragleave", handleDragLeave);
+        inputArea.removeEventListener("drop", handleDrop);
+      };
+    }
+    return () => {}; // Return empty function for cleanup if inputArea not found
+  }, [darkMode]); // Re-run if darkMode changes for border classes
+
+  const handleTranslate = async () => {
+    if (!text.trim()) {
+      setError("Please enter text for translation.");
+      return;
+    }
+
+    // Check if Ollama is selected in production environment
+    if (isProduction && provider === "ollama") {
+      setError(
+        "Ollama model is disabled in production environment. Please select Gemini API."
+      );
+      return; // Stop translation
+    }
+
+    setLoading(true);
+    setTranslated("");
+    setError(null);
+
+    const apiRoute =
+      provider === "ollama" ? "/api/translate" : "/api/translate-gemini";
+
+    try {
+      const res = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, direction }),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+        console.error("Backend API error:", res.status, errorBody);
+        throw new Error(
+          `API error: ${res.status} ${res.statusText} - ${errorBody}`
+        );
+      }
+
+      if (!res.body) {
+        throw new Error("Response body is empty. Expected a stream.");
+      }
+
+      // --- Stream handling logic remains the same ---
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let isDone = false;
+      let translatedText = "";
+
+      while (!isDone) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          isDone = true;
+          if (buffer.trim()) {
+            console.warn("Stream ended, but buffer contains data:", buffer);
+          }
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          try {
+            const json = JSON.parse(line);
+
+            if (json.response !== undefined) {
+              translatedText += json.response;
+              setTranslated(translatedText);
+            }
+
+            if (json.done === true) {
+              isDone = true;
+              reader.cancel();
+              break;
+            }
+          } catch (parseError) {
+            console.error("Failed to parse JSON line:", line, parseError);
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const json = JSON.parse(buffer);
+          if (json.response !== undefined) {
+            translatedText += json.response;
+            setTranslated(translatedText);
+          }
+        } catch (parseError) {
+          console.error(
+            "Failed to parse remaining buffer as JSON:",
+            buffer,
+            parseError
+          );
+        }
+      }
+
+      // Add to history only after the translation is fully received
+      // Convert direction and provider to readable strings for history
+      const historyDirection =
+        direction === "modern-to-ancient" ? "Νέα → Αρχαία" : "Αρχαία → Νέα";
+      const historyProvider = provider === "ollama" ? "Ollama" : "Gemini";
+
+      setHistory((prev) => [
+        {
+          input: text,
+          output: translatedText,
+          direction: historyDirection,
+          provider: historyProvider,
+          timestamp: Date.now(), // Add timestamp
+        },
+        ...prev.slice(0, 9), // Keep only last 10 translations
+      ]);
+    } catch (err: any) {
+      console.error("General translation error:", err);
+      setError(err.message || "An unknown error occurred.");
+      setTranslated("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleDirection = () => {
+    const newDirection =
+      direction === "modern-to-ancient"
+        ? "ancient-to-modern"
+        : "modern-to-ancient";
+    setDirection(newDirection);
+
+    // Swap text areas and clear translation on direction change
+    const currentInput = text;
+    const currentTranslated = translated;
+    setText(currentTranslated);
+    setTranslated(currentInput); // <-- Swap translated text to input on direction change
+    setError(null);
+  };
+
+  // 2. Input Text Clear Button
+  const clearInputText = () => {
+    setText("");
+    setTranslated(""); // Clear translation too
+    setError(null); // Clear error
+    // Optional: stop listening if active
+    if (isListening) {
+      toggleListening();
+    }
+  };
+
+  // Share functionality (remains the same)
+  const shareTranslation = async () => {
+    if (!translated) return;
+
+    if (isShareApiSupported) {
+      try {
+        await navigator.share({
+          title: "Ancient/Modern Greek Translation",
+          text: translated,
+          url: window.location.href,
+        });
+        console.log("Translation shared successfully");
+      } catch (shareError: any) {
+        console.error("Error sharing translation:", shareError);
+      }
+    } else {
+      console.warn("Web Share API not supported.");
+      setError("Sharing is not supported in this browser."); // Inform user
+    }
+  };
+
+  // Copy to Clipboard functionality (remains the same)
+  const copyToClipboard = () => {
+    if (translated) {
+      navigator.clipboard.writeText(translated);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    }
+  };
+
+  // Copy input text functionality (remains the same)
+  const copyInputText = () => {
+    if (text) {
+      navigator.clipboard.writeText(text);
+      setCopyTooltip(true);
+      setTimeout(() => setCopyTooltip(false), 2000);
+    }
+  };
+
+  // Download translation as text file (remains the same)
+  const downloadTranslation = () => {
+    if (translated) {
+      const element = document.createElement("a");
+      const file = new Blob([translated], { type: "text/plain" });
+      element.href = URL.createObjectURL(file);
+
+      const directionText =
+        direction === "modern-to-ancient"
+          ? "modern-to-ancient"
+          : "ancient-to-modern";
+      element.download = `greek-translation-${directionText}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.txt`;
+
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
+  };
+
+  // Load from History (updated to handle new history item structure)
+  const loadFromHistory = (item: TranslationHistoryItem) => {
+    setText(item.input);
+    setTranslated(item.output);
+    // Restore direction based on stored value
+    setDirection(
+      item.direction === "Νέα → Αρχαία"
+        ? "modern-to-ancient"
+        : "ancient-to-modern"
+    );
+    // Restore provider based on stored value
+    setProvider(item.provider.toLowerCase() as "ollama" | "gemini");
+    setShowHistory(false);
+    setError(null); // Clear errors
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem("translationHistory"); // Clear from localStorage too
+    setShowHistory(false);
+  };
+
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
+  };
+
+  const inputLabel =
+    direction === "modern-to-ancient"
+      ? "Κείμενο (Νέα Ελληνικά)"
+      : "Κείμενο (Αρχαία Ελληνικά)";
+  const outputLabel =
+    direction === "modern-to-ancient"
+      ? "Μετάφραση (Αρχαία Ελληνικά)"
+      : "Μετάφραση (Νέα Ελληνικά)";
+
+  // Dynamic theme classes
+  const themeClasses = darkMode
+    ? "bg-gradient-to-br from-gray-900 to-black text-white"
+    : "bg-gradient-to-br from-blue-50 to-white text-gray-900";
+
+  const cardClasses = darkMode
+    ? "bg-gray-800/50 backdrop-blur-lg border-gray-700"
+    : "bg-white/70 backdrop-blur-lg border-gray-200";
+
+  const inputBgClasses = darkMode
+    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-500"
+    : "bg-gray-100/80 border-gray-300 text-gray-800 placeholder-gray-400";
+
+  const buttonGradient = darkMode
+    ? "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+    : "bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600";
+
+  const secondaryButtonClasses = darkMode
+    ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
+    : "bg-gray-200 hover:bg-gray-300 text-gray-700";
+
+  const tooltipClasses = darkMode
+    ? "bg-gray-700 text-white"
+    : "bg-gray-100 text-gray-800";
+
+  const actionButtonClasses = darkMode
+    ? "bg-blue-600/20 hover:bg-blue-500/30 text-blue-400 border-blue-700/30"
+    : "bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200";
+
+  return (
+    <main
+      className={`min-h-screen ${themeClasses} p-6 flex flex-col items-center py-12 transition-colors duration-300`}
+    >
+      <div
+        className={`w-full max-w-5xl ${cardClasses} rounded-3xl shadow-2xl border p-8 space-y-8 transition-colors duration-300`}
+      >
+        <div className="flex justify-between items-center">
+          <h1 className="text-4xl font-extrabold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-500">
+            Greek AI Translator
+          </h1>
+
+          {/* Top Action Buttons */}
+          <div className="flex gap-3">
+            {/* History Button */}
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-3 ${secondaryButtonClasses} rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              aria-label="Translation history"
+            >
+              <History
+                className={darkMode ? "text-blue-400" : "text-blue-600"}
+                size={20}
+              />
+            </button>
+
+            {/* 12. Feedback Placeholder Button */}
+            <button
+              // onClick={} // To be developed
+              className={`p-3 ${secondaryButtonClasses} rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              aria-label="Provide feedback"
+              title="Feedback (Under development)"
+            >
+              <MessageCircle
+                className={darkMode ? "text-yellow-400" : "text-yellow-600"}
+                size={20}
+              />
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className={`p-3 ${secondaryButtonClasses} rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              aria-label="Toggle theme"
+            >
+              {darkMode ? (
+                <Sun className="text-yellow-400" size={20} />
+              ) : (
+                <Moon className="text-blue-600" size={20} />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-center text-lg">
+          <span className="font-semibold">Μεταφραστής</span> Αρχαίων/Νέων
+          Ελληνικών
+        </p>
+
+        {/* Provider Selection */}
+        <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
+          <span
+            className={`text-lg font-semibold ${
+              darkMode ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            Επιλογή Μοντέλου:
+          </span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <input
+                type="radio"
+                id="provider-ollama"
+                name="provider"
+                value="ollama"
+                checked={provider === "ollama"}
+                onChange={() => setProvider("ollama")}
+                className={`form-radio h-5 w-5 accent-blue-500`}
+                disabled={loading || isProduction} // <-- Disable in production
+              />
+              <label
+                htmlFor="provider-ollama"
+                className={`flex items-center ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } cursor-pointer ${
+                  isProduction ? "opacity-50 cursor-not-allowed" : ""
+                }`} // <-- Visual cue for disabled
+              >
+                <Cpu
+                  className={`mr-2 ${
+                    darkMode ? "text-blue-400" : "text-blue-600"
+                  }`}
+                  size={20}
+                />
+                <span>Ollama</span>
+                <span className="ml-2 px-2 py-1 bg-blue-900/30 text-xs rounded-full text-blue-300">
+                  Local
+                </span>
+                {isProduction && (
+                  <span className="ml-2 text-xs text-red-400">
+                    (Disabled in Production)
+                  </span>
+                )}{" "}
+                {/* <-- Text cue */}
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="radio"
+                id="provider-gemini"
+                name="provider"
+                value="gemini"
+                checked={provider === "gemini"}
+                onChange={() => setProvider("gemini")}
+                className="form-radio h-5 w-5 accent-violet-500"
+                disabled={loading}
+              />
+              <label
+                htmlFor="provider-gemini"
+                className={`flex items-center ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } cursor-pointer`}
+              >
+                <Cloud
+                  className={`mr-2 ${
+                    darkMode ? "text-violet-400" : "text-violet-600"
+                  }`}
+                  size={20}
+                />
+                <span>Gemini AI</span>
+                <span className="ml-2 px-2 py-1 bg-violet-900/30 text-xs rounded-full text-violet-300">
+                  Cloud
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Direction Toggle */}
+        <div className="flex items-center justify-center gap-4 py-2">
+          <span
+            className={`text-lg font-semibold ${
+              darkMode ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            {direction === "modern-to-ancient"
+              ? "Νέα Ελληνικά"
+              : "Αρχαία Ελληνικά"}
+          </span>
+          <button
+            onClick={toggleDirection}
+            className={`p-3 ${secondaryButtonClasses} rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            aria-label="Change Translation Direction"
+            disabled={loading}
+          >
+            <ArrowRightLeft
+              className={darkMode ? "text-blue-400" : "text-blue-600"}
+              size={20}
+            />
+          </button>
+          <span
+            className={`text-lg font-semibold ${
+              darkMode ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            {direction === "modern-to-ancient"
+              ? "Αρχαία Ελληνικά"
+              : "Νέα Ελληνικά"}
+          </span>
+        </div>
+
+        {/* Translation Interface */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Input */}
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-3">
+              <label
+                htmlFor="inputText"
+                className={`block ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } text-lg font-medium`}
+              >
+                {inputLabel}:
+                <span className="text-sm font-normal ml-2">
+                  {characterCount > 0 && `(${characterCount} characters)`}
+                </span>
+              </label>
+
+              {/* Input text actions */}
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              {/* 3. Voice Input Button */}
+              {isSpeechApiSupported && (
+                <button
+                  onClick={toggleListening}
+                  className={`p-2 ${
+                    isListening
+                      ? darkMode
+                        ? "bg-red-600/30 text-red-400"
+                        : "bg-red-200 text-red-700"
+                      : secondaryButtonClasses
+                  } rounded-lg text-sm flex items-center gap-1 transition-colors duration-200`}
+                  aria-label={
+                    isListening ? "Stop voice input" : "Start voice input"
+                  }
+                  title={isListening ? "Stop dictation" : "Start dictation"}
+                  disabled={loading} // Can't dictate while translating
+                >
+                  {isListening ? (
+                    <Loader2 size={16} className="animate-spin text-red-500" /> // Spinner when listening
+                  ) : (
+                    <Mic
+                      size={16}
+                      className={darkMode ? "text-blue-400" : "text-blue-600"}
+                    />
+                  )}
+                  <span>{isListening ? "Ακούω..." : "Φωνητική Αναζήτηση"}</span>
+                </button>
+              )}
+
+              {/* 2. Clear Input Button */}
+              {text && ( // Show only if there's text
+                <button
+                  onClick={clearInputText}
+                  className={`p-2 ${secondaryButtonClasses} rounded-lg text-sm flex items-center gap-1 transition-colors duration-200`}
+                  aria-label="Clear input text"
+                  title="Clear"
+                >
+                  <X
+                    size={16}
+                    className={darkMode ? "text-red-400" : "text-red-600"}
+                  />
+                  <span>Καθαρισμός</span>
+                </button>
+              )}
+
+              {/* Input text copy button (moved into action group) */}
+              {text && (
+                <div className="relative">
+                  {" "}
+                  {/* Keep relative for tooltip positioning */}
+                  <button
+                    onClick={copyInputText}
+                    className={`p-2 ${secondaryButtonClasses} rounded-lg text-sm flex items-center gap-1 transition-colors duration-200`}
+                    aria-label="Copy input text"
+                  >
+                    <ClipboardCopy
+                      size={16}
+                      className={darkMode ? "text-blue-400" : "text-blue-600"}
+                    />
+                    <span>Αντιγραφή</span>
+                  </button>
+                  {copyTooltip && (
+                    <div
+                      className={`absolute right-0 top-full mt-2 px-3 py-1 rounded-md text-sm shadow-lg ${tooltipClasses} z-10`}
+                    >
+                      Copied!
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Input Textarea - with Drag and Drop */}
+            <div // <-- Wrapper div for drag and drop
+              //@ts-expect-error Ref
+              ref={inputTextAreaRef} // <-- Attach ref here
+              className={`relative flex-grow rounded-xl ${inputBgClasses} border transition-colors duration-200 ease-in-out overflow-hidden ${
+                loading ? "opacity-70" : ""
+              }`}
+              // We don't add onDragOver/onDrop here, handle them with addEventListener in useEffect
+              // You can add class for visual feedback during dragover
+            >
+              <textarea
+                id="inputText"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Type your text here or drag & drop a .txt file..." // <-- Updated placeholder
+                className={`w-full h-full p-4 bg-transparent text-lg placeholder-gray-500 resize-none overflow
+                  loading ? "cursor-progress" : ""
+                }`}
+                disabled={loading}
+              ></textarea>
+              {loading && ( // Optional: overlay visual cue when loading
+                <div className="absolute inset-0 bg-black/20"></div>
+              )}
+            </div>
+          </div>
+
+          {/* Output */}
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-3">
+              <label
+                htmlFor="translatedText"
+                className={`block ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } text-lg font-medium`}
+              >
+                {outputLabel}:
+                {loading && (
+                  <Loader2
+                    className={`animate-spin inline-block ml-3 ${
+                      darkMode ? "text-blue-400" : "text-blue-600"
+                    }`}
+                    size={20}
+                  />
+                )}
+              </label>
+
+              {/* Enhanced copy/download/share options for translation */}
+              {translated && (
+                <div className="flex items-center gap-2">
+                  {/* Copy button for output */}
+                  <button
+                    onClick={copyToClipboard}
+                    className={`px-3 py-2 ${actionButtonClasses} rounded-lg text-sm flex items-center gap-1 transition-colors duration-200 border shadow-sm hover:shadow`}
+                    aria-label="Αντιγραφή μετάφρασης"
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={16} className="text-green-500" />
+                        <span>Αντιγράφηκε</span>
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardCopy
+                          size={16}
+                          className={
+                            darkMode ? "text-blue-400" : "text-blue-600"
+                          }
+                        />
+                        <span>Αντιγραφή</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Download button */}
+                  <button
+                    onClick={downloadTranslation}
+                    className={`px-3 py-2 ${secondaryButtonClasses} rounded-lg text-sm transition-colors duration-200`}
+                    aria-label="Λήψη μετάφρασης ως αρχείο"
+                    title="Λήψη ως αρχείο κειμένου"
+                  >
+                    <Download
+                      size={16}
+                      className={darkMode ? "text-blue-400" : "text-blue-600"}
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`relative flex-grow min-h-[220px] rounded-xl ${inputBgClasses} border transition-colors duration-200 ease-in-out overflow-hidden`}
+            >
+              <textarea
+                id="translatedText"
+                value={translated}
+                readOnly
+                placeholder={
+                  loading
+                    ? "Μετάφραση σε εξέλιξη..."
+                    : "Η μετάφραση θα εμφανιστεί εδώ..."
+                }
+                className={`w-full h-full p-4 bg-transparent text-lg placeholder-gray-500 resize-none overflow-auto focus:outline-none`}
+              ></textarea>
+
+              {/* Loading progress bar */}
+              {loading && (
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 bg-size-200 animate-gradient-x"></div>
+              )}
+
+              {/* Quick Copy Overlay - Appears when hovering over output */}
+              {translated && !loading && (
+                <div className="absolute inset-0 bg-transparent flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    onClick={copyToClipboard}
+                    className={`p-4 rounded-full ${
+                      darkMode ? "bg-blue-600/80" : "bg-blue-500/80"
+                    } text-white shadow-lg transform transition-transform duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    aria-label="Quick copy translation"
+                  >
+                    {copied ? (
+                      <Check size={24} className="text-white" />
+                    ) : (
+                      <ClipboardCopy size={24} className="text-white" /> // Changed to ClipboardCopy for consistency
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Translate Button */}
+        <button
+          onClick={handleTranslate}
+          disabled={
+            loading || !text.trim() || (isProduction && provider === "ollama")
+          } // <-- Disable if Ollama is selected in production
+          className={`w-full ${buttonGradient} text-white font-bold py-4 rounded-xl text-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="animate-spin" size={24} />
+              <span>Μετάφραση σε εξέλιξη...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles size={20} />
+              <span>Μετάφραση</span>
+            </>
+          )}
+        </button>
+
+        {error && (
+          <div className="p-4 bg-red-800/50 border border-red-700 text-red-300 rounded-lg">
+            Σφάλμα: {error}
+          </div>
+        )}
+
+        {/* Footer Note */}
+        <p
+          className={`text-center ${
+            darkMode ? "text-gray-500" : "text-gray-600"
+          } text-sm mt-8`}
+        >
+          Πάροχος:{" "}
+          {provider === "ollama"
+            ? "Ollama (Τοπικό LLM)"
+            : "Gemini API (Cloud LLM)"}
+          .
+          <br />Η ταχύτητα εξαρτάται από τον πάροχο και το hardware.
+          {provider === "gemini" &&
+            !process.env.NEXT_PUBLIC_GEMINI_API_KEY_EXISTS &&
+            !isProduction && (
+              <span className="text-yellow-400 block text-xs mt-1">
+                Σημείωση: Βεβαιωθείτε ότι το GEMINI_API_KEY είναι ρυθμισμένο
+                στις environment variables του backend.
+              </span>
+            )}
+          {isProduction && provider === "ollama" && (
+            <span className="text-red-400 block text-xs mt-1">
+              Το μοντέλο Ollama είναι απενεργοποιημένο σε production περιβάλλον.
+            </span>
+          )}
+          {!isSpeechApiSupported && (
+            <span
+              className={`${
+                darkMode ? "text-gray-400" : "text-gray-500"
+              } block text-xs mt-1`}
+            >
+              Σημείωση: Η φωνητική εισαγωγή δεν υποστηρίζεται σε αυτόν τον
+              browser.
+            </span>
+          )}
+        </p>
+      </div>
+
+      {/* History Panel */}
+      {showHistory && (
+        <div
+          className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6`}
+        >
+          <div
+            className={`w-full max-w-3xl ${cardClasses} rounded-3xl shadow-2xl border p-6 space-y-6 overflow-hidden`}
+          >
+            <div className="flex justify-between items-center">
+              <h2
+                className={`text-2xl font-bold ${
+                  darkMode ? "text-white" : "text-gray-800"
+                }`}
+              >
+                Ιστορικό Μεταφράσεων
+              </h2>
+              <button
+                onClick={() => setShowHistory(false)}
+                className={`px-4 py-2 ${secondaryButtonClasses} rounded-lg`}
+              >
+                Κλείσιμο
+              </button>
+            </div>
+
+            {history.length > 0 ? (
+              <>
+                <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
+                  {history.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${
+                        darkMode
+                          ? "bg-gray-700/70 border-gray-600 hover:bg-gray-700"
+                          : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+                      }`}
+                      onClick={() => loadFromHistory(item)}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            darkMode ? "text-blue-300" : "text-blue-600"
+                          }`}
+                        >
+                          {item.direction}
+                        </span>
+                        <span
+                          className={`text-xs ${
+                            darkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          {item.provider}
+                        </span>
+                      </div>
+                      <p
+                        className={`text-sm ${
+                          darkMode ? "text-gray-300" : "text-gray-700"
+                        } mb-1 whitespace-pre-wrap break-words max-h-12 overflow-hidden text-ellipsis`} // Added styles to better handle long input
+                      >
+                        {item.input}
+                      </p>
+                      <div
+                        className={`text-sm ${
+                          darkMode ? "text-gray-400" : "text-gray-500"
+                        } mt-1 whitespace-pre-wrap break-words max-h-12 overflow-hidden text-ellipsis`} // Added styles to better handle long output
+                      >
+                        {item.output}
+                      </div>
+                      {/* Optional: Display timestamp */}
+                      {item.timestamp && (
+                        <span
+                          className={`block text-right text-xs ${
+                            darkMode ? "text-gray-500" : "text-gray-400"
+                          } mt-1`}
+                        >
+                          {new Date(item.timestamp).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={clearHistory}
+                    className={`px-4 py-2 ${secondaryButtonClasses} rounded-lg text-sm`}
+                  >
+                    Καθαρισμός Ιστορικού
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p
+                className={`text-center py-10 ${
+                  darkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                Δεν υπάρχουν αποθηκευμένες μεταφράσεις.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

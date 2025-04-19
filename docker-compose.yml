@@ -1,0 +1,117 @@
+version: '3.8' # Use a modern Docker Compose version
+
+services:
+  # Service for the Next.js application
+  app:
+    build:
+      context: . # Builds the image from the current directory (where the Dockerfile is)
+      dockerfile: Dockerfile # Specifies which Dockerfile to use
+    container_name: greek_translator_app # A friendly name for the container
+    ports:
+      - "3000:3000" # Maps host port 3000 to container port 3000
+
+    # Defines dependencies. The app container will start after ollama_model_setup
+    # (which ensures the model is downloaded)
+    depends_on:
+      - ollama_model_setup # Waits for the model setup service to complete
+
+    # Environment variables for the Next.js application
+    environment:
+      # NODE_ENV=production is already set in the Dockerfile, but you can also set it here
+      # - NODE_ENV=production
+
+      # Pass the Gemini API key to the container.
+      # Docker Compose will read it from the host's environment variables (e.g., from .env.local)
+      # Make sure you have the line GEMINI_API_KEY=YOUR_KEY in the .env.local file at the project root.
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Set the Ollama host for the Next.js application to communicate via the Docker network
+      # "ollama" is the name of the Ollama service in Docker Compose
+      # This env var can be used in the backend API route instead of http://localhost:11434
+      # If you use the 'ollama' library in the backend, it automatically reads OLLAMA_HOST
+      # If you use fetch, you need to change it in the fetch URL
+      - OLLAMA_HOST=http://ollama:11434
+
+      # You can pass other env vars if needed
+      # - SOME_OTHER_VAR=value
+
+    # Connects the service to the shared network
+    networks:
+      - app_network
+
+    # For easy development (only in development!): Bind mount the code
+    # In production build, this is not needed and not recommended
+    # volumes:
+    #  - .:/app # Bind mount the project folder to /app inside the container
+    #  - /app/node_modules # Exclude the node_modules folder from the bind mount
+
+    # Command for development (overrides the Dockerfile's CMD)
+    # command: npm run dev
+
+
+  # Service for the Ollama server
+  ollama:
+    image: ollama/ollama # Use the official Ollama image
+    container_name: ollama_service # A friendly name
+    # Expose port 11434 of Ollama to the host (optional, useful for debugging or downloading models manually)
+    ports:
+      - "11434:11434"
+
+    # Persistent storage for Ollama models and data
+    volumes:
+      - ollama_data:/root/.ollama
+
+    # Connects the service to the shared network
+    networks:
+      - app_network
+
+    # Entrypoint: Starts the Ollama server in the background and keeps the container alive
+    # The entrypoint is suitable for running the server and preventing the container from exiting
+    # We don't put the pull command here; we do it in a separate service for clarity
+    entrypoint: ["ollama", "serve"]
+
+
+  # Helper service to download the Ollama model
+  # Runs once during 'docker-compose up'
+  ollama_model_setup:
+    image: ollama/ollama # Use the same image again
+    container_name: ollama_model_setup # Friendly name
+    depends_on:
+      - ollama # Ensures the Ollama server is running before attempting to pull
+    volumes:
+      - ollama_data:/root/.ollama # Uses the same volume to store the model
+
+    # Command to pull the specific model. Waits until the ollama service is reachable.
+    # This is more robust than a simple sleep.
+    command: >
+      bash -c "
+        # Wait until the Ollama API is available (up to 60 seconds)
+        echo 'Waiting for Ollama service to be available...'
+        timeout 60 bash -c 'until curl --silent --output /dev/null http://ollama:11434/; do sleep 0.5; done;'
+        if [ $? -ne 0 ]; then
+          echo 'Ollama service did not become available within timeout.'
+          exit 1
+        fi
+        echo 'Ollama service is available. Pulling model...'
+        # Pull the specific model
+        ollama pull ilsp/meltemi-instruct
+        echo 'Model pull finished.'
+      "
+    networks:
+      - app_network # Connects the service to the shared network
+
+    # Set the restart policy to "on-failure" or "no"
+    # We don't want it to try pulling the model again if it fails (unless explicitly desired)
+    # "no" is usually a safe choice for such init services
+    restart: "no"
+
+
+# Define a shared network for the services
+networks:
+  app_network:
+    driver: bridge # The default network type
+
+# Define a named volume for persistent storage
+volumes:
+  ollama_data:
+    driver: local # The default driver for local volumes
