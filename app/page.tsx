@@ -987,6 +987,13 @@ export default function Home() {
             </span>
           )}
         </p>
+        <p
+          className={`text-center ${
+            darkMode ? "text-gray-500" : "text-gray-600"
+          } text-sm mt-8`}
+        >
+          Giorgos Iliopoulos © {new Date().getFullYear()}
+        </p>
       </div>
 
       {/* History Panel */}
