@@ -27,9 +27,9 @@ export default function Home() {
   >("modern-to-ancient");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<"ollama" | "gemini" | "deepsick">(
-    "ollama"
-  );
+  const [provider, setProvider] = useState<
+    "ollama" | "gemini" | "deepsick" | "chatgpt"
+  >("ollama");
   const [history, setHistory] = useState<TranslationHistoryItem[]>([]); // Using the interface
   const [showHistory, setShowHistory] = useState(false);
   const [darkMode, setDarkMode] = useState(true); // Default dark mode
@@ -293,6 +293,8 @@ export default function Home() {
       apiRoute = "/api/translate-gemini"; // This route handles Gemini
     } else if (provider === "deepsick") {
       apiRoute = "/api/translate-deepsick";
+    } else if (provider === "chatgpt") {
+      apiRoute = "/api/translate-gpt";
     } else {
       setError("Μη υποστηριζόμενος πάροχος.");
       setLoading(false);
@@ -382,12 +384,14 @@ export default function Home() {
       // Convert direction and provider to readable strings for history
       const historyDirection =
         direction === "modern-to-ancient" ? "Νέα → Αρχαία" : "Αρχαία → Νέα";
-      const historyProvider: "Ollama" | "Gemini" | "DeepSeek" = // <-- Specify type
+      const historyProvider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT" = // <-- Update type
         provider === "ollama"
           ? "Ollama"
           : provider === "gemini"
           ? "Gemini"
-          : "DeepSeek"; // <-- Add DeepSeek case
+          : provider === "deepsick"
+          ? "DeepSeek"
+          : "ChatGPT"; // <-- Add ChatGPT case
 
       setHistory((prev) => [
         {
@@ -496,7 +500,11 @@ export default function Home() {
     );
     // Restore provider based on stored value
     setProvider(
-      item.provider.toLowerCase() as "ollama" | "gemini" | "deepsick"
+      item.provider.toLowerCase() as
+        | "ollama"
+        | "gemini"
+        | "deepsick"
+        | "chatgpt"
     );
     setShowHistory(false);
     setError(null); // Clear errors
@@ -620,6 +628,35 @@ export default function Home() {
         {/* Provider Selection */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="flex items-center gap-3">
+              <input
+                type="radio"
+                id="provider-chatgpt" // <-- Unique ID for ChatGPT radio button
+                name="provider" // <-- Use the same name for the group
+                value="chatgpt" // <-- Value to set the state
+                checked={provider === "chatgpt"} // <-- Checked if this provider is selected
+                onChange={() => setProvider("chatgpt")} // <-- Update provider state on change
+                className="form-radio h-5 w-5 accent-green-500" // <-- Choose an accent color (e.g., green)
+                disabled={loading}
+              />
+              <label
+                htmlFor="provider-chatgpt" // <-- Link label to input ID
+                className={`flex items-center ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } cursor-pointer`}
+              >
+                <Cloud // Or Sparkles, or a custom icon you prefer for OpenAI/ChatGPT
+                  className={`mr-2 ${
+                    darkMode ? "text-green-400" : "text-green-600"
+                  }`} // <-- Icon color
+                  size={20}
+                />
+                <span>ChatGPT</span> {/* <-- Label text */}
+                <span className="ml-2 px-2 py-1 bg-green-900/30 text-xs rounded-full text-green-300">
+                  Cloud
+                </span>
+              </label>
+            </div>
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -1005,12 +1042,15 @@ export default function Home() {
         >
           Πάροχος:{" "}
           {provider === "ollama"
-            ? `Ollama (Τοπικό LLM - ${"Meltemi"})`
+            ? `Ollama (Local LLM - Meltemi)` // Text for Ollama local models
             : provider === "gemini"
-            ? "Gemini API (Cloud LLM)"
+            ? "Gemini API (Cloud LLM)" // Text for Gemini
             : provider === "deepsick"
-            ? "DeepSeek API (Cloud LLM)" // <-- New text for DeepSeek
-            : "Άγνωστος"}
+            ? "DeepSeek API (Cloud LLM)" // Text for DeepSeek
+            : provider === "chatgpt"
+            ? "ChatGPT API (Cloud LLM)" // <-- New text for ChatGPT
+            : "Αγνωστος"}{" "}
+          {/* Fallback just in case */}
           .
           <br />Η ταχύτητα εξαρτάται από τον πάροχο και το hardware.
           {provider === "gemini" &&

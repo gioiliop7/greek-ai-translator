@@ -24,6 +24,7 @@ services:
       # Docker Compose will read it from the host's environment variables (e.g., from .env.local)
       # Make sure you have the line GEMINI_API_KEY=YOUR_KEY in the .env.local file at the project root.
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
 
       # Set the Ollama host for the Next.js application to communicate via the Docker network
       # "ollama" is the name of the Ollama service in Docker Compose
