@@ -27,7 +27,9 @@ export default function Home() {
   >("modern-to-ancient");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<"ollama" | "gemini">("ollama");
+  const [provider, setProvider] = useState<"ollama" | "gemini" | "deepsick">(
+    "ollama"
+  );
   const [history, setHistory] = useState<TranslationHistoryItem[]>([]); // Using the interface
   const [showHistory, setShowHistory] = useState(false);
   const [darkMode, setDarkMode] = useState(true); // Default dark mode
@@ -282,8 +284,20 @@ export default function Home() {
     setTranslated("");
     setError(null);
 
-    const apiRoute =
-      provider === "ollama" ? "/api/translate" : "/api/translate-gemini";
+    // Determine the API route and the model name (modelName only for Ollama)
+    let apiRoute: string;
+
+    if (provider === "ollama") {
+      apiRoute = "/api/translate"; // This route handles Ollama
+    } else if (provider === "gemini") {
+      apiRoute = "/api/translate-gemini"; // This route handles Gemini
+    } else if (provider === "deepsick") {
+      apiRoute = "/api/translate-deepsick";
+    } else {
+      setError("Μη υποστηριζόμενος πάροχος.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch(apiRoute, {
@@ -368,7 +382,12 @@ export default function Home() {
       // Convert direction and provider to readable strings for history
       const historyDirection =
         direction === "modern-to-ancient" ? "Νέα → Αρχαία" : "Αρχαία → Νέα";
-      const historyProvider = provider === "ollama" ? "Ollama" : "Gemini";
+      const historyProvider: "Ollama" | "Gemini" | "DeepSeek" = // <-- Specify type
+        provider === "ollama"
+          ? "Ollama"
+          : provider === "gemini"
+          ? "Gemini"
+          : "DeepSeek"; // <-- Add DeepSeek case
 
       setHistory((prev) => [
         {
@@ -476,7 +495,9 @@ export default function Home() {
         : "ancient-to-modern"
     );
     // Restore provider based on stored value
-    setProvider(item.provider.toLowerCase() as "ollama" | "gemini");
+    setProvider(
+      item.provider.toLowerCase() as "ollama" | "gemini" | "deepsick"
+    );
     setShowHistory(false);
     setError(null); // Clear errors
   };
@@ -588,15 +609,16 @@ export default function Home() {
           Ελληνικών
         </p>
 
+        <div
+          className={`text-lg font-semibold text-center ${
+            darkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          Επιλογή Μοντέλου
+        </div>
+
         {/* Provider Selection */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
-          <span
-            className={`text-lg font-semibold ${
-              darkMode ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Επιλογή Μοντέλου:
-          </span>
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="flex items-center gap-3">
               <input
@@ -660,6 +682,35 @@ export default function Home() {
                 />
                 <span>Gemini AI</span>
                 <span className="ml-2 px-2 py-1 bg-violet-900/30 text-xs rounded-full text-violet-300">
+                  Cloud
+                </span>
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="radio"
+                id="provider-deepsick" // <-- New ID
+                name="provider"
+                value="deepsick" // <-- New value
+                checked={provider === "deepsick"}
+                onChange={() => setProvider("deepsick")} // <-- Update provider state
+                className="form-radio h-5 w-5 accent-cyan-500" // <-- Choose an accent color
+                disabled={loading || isProduction}
+              />
+              <label
+                htmlFor="provider-deepsick"
+                className={`flex items-center ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } cursor-pointer`}
+              >
+                <Cloud // Or another icon you prefer (Cloud ταιριάζει για API)
+                  className={`mr-2 ${
+                    darkMode ? "text-cyan-400" : "text-cyan-600"
+                  }`} // <-- Icon color
+                  size={20}
+                />
+                <span>DeepSeek AI</span> {/* <-- New label text */}
+                <span className="ml-2 px-2 py-1 bg-cyan-900/30 text-xs rounded-full text-cyan-300">
                   Cloud
                 </span>
               </label>
@@ -959,8 +1010,12 @@ export default function Home() {
         >
           Πάροχος:{" "}
           {provider === "ollama"
-            ? "Ollama (Τοπικό LLM)"
-            : "Gemini API (Cloud LLM)"}
+            ? `Ollama (Τοπικό LLM - ${"Meltemi"})`
+            : provider === "gemini"
+            ? "Gemini API (Cloud LLM)"
+            : provider === "deepsick"
+            ? "DeepSeek API (Cloud LLM)" // <-- New text for DeepSeek
+            : "Άγνωστος"}
           .
           <br />Η ταχύτητα εξαρτάται από τον πάροχο και το hardware.
           {provider === "gemini" &&
@@ -974,6 +1029,12 @@ export default function Home() {
           {isProduction && provider === "ollama" && (
             <span className="text-red-400 block text-xs mt-1">
               Το μοντέλο Ollama είναι απενεργοποιημένο σε production περιβάλλον.
+            </span>
+          )}
+          {isProduction && provider === "deepsick" && (
+            <span className="text-red-400 block text-xs mt-1">
+              Το μοντέλο Deepsick είναι απενεργοποιημένο σε production
+              περιβάλλον.
             </span>
           )}
           {!isSpeechApiSupported && (
