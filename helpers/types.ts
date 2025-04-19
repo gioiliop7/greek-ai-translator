@@ -5,11 +5,10 @@ export interface Window {
   webkitSpeechGrammarList: typeof SpeechGrammarList;
   SpeechRecognitionEvent: typeof SpeechRecognitionEvent;
 }
-
 export interface TranslationHistoryItem {
   input: string;
   output: string;
-  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα"; // Store as readable string
-  provider: "Ollama" | "Gemini"; // Store as readable string
-  timestamp: number; // Added timestamp
+  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα";
+  provider: "Ollama" | "Gemini" | "DeepSeek";
+  timestamp: number;
 }
