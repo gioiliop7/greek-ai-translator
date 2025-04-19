@@ -649,11 +649,6 @@ export default function Home() {
                 <span className="ml-2 px-2 py-1 bg-blue-900/30 text-xs rounded-full text-blue-300">
                   Local
                 </span>
-                {isProduction && (
-                  <span className="ml-2 text-xs text-red-400">
-                    (Disabled in Production)
-                  </span>
-                )}{" "}
                 {/* <-- Text cue */}
               </label>
             </div>
