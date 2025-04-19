@@ -536,7 +536,7 @@ export default function Home() {
       <div
         className={`w-full max-w-5xl ${cardClasses} rounded-3xl shadow-2xl border p-8 space-y-8 transition-colors duration-300`}
       >
-        <div className="flex justify-between items-center">
+        <div className="flex-col md:flex-row flex justify-between items-center">
           <h1 className="text-4xl font-extrabold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-500">
             Lexi AI
           </h1>
@@ -597,7 +597,7 @@ export default function Home() {
           >
             Επιλογή Μοντέλου:
           </span>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -720,7 +720,7 @@ export default function Home() {
               {/* Input text actions */}
             </div>
 
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-4 flex-col md:flex-row">
               {/* 3. Voice Input Button */}
               {isSpeechApiSupported && (
                 <button
