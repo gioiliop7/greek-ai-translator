@@ -858,7 +858,7 @@ export default function Home() {
                 id="inputText"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Type your text here or drag & drop a .txt file..." // <-- Updated placeholder
+                placeholder="Πληκτρολόγησε εδώ ή τοποθέτησε ένα .txt αρχείο για να στείλεις το κειμενό σου" // <-- Updated placeholder
                 className={`w-full h-full p-4 bg-transparent text-lg placeholder-gray-500 resize-none overflow
                   loading ? "cursor-progress" : ""
                 }`}
