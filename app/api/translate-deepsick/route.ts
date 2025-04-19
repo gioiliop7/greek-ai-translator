@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 
             try {
               // Parse the JSON chunk
-              const json: any = JSON.parse(jsonString); // Use any temporarily, or define a type for DeepSeek stream chunks
+              const json = JSON.parse(jsonString);
 
               // Extract the content (adjust based on DeepSeek's JSON structure)
               const content =
