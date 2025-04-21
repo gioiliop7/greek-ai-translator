@@ -1162,7 +1162,7 @@ export default function Home() {
           onClick={() => setShowHistory(false)}
         >
           <div
-            className={`relative ${cardClasses} rounded-lg shadow-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto transition-colors duration-300`}
+            className={`relative ${cardClasses} rounded-lg shadow-xl p-6 w-full max-w-[70%] max-h-[80vh] overflow-y-auto transition-colors duration-300`}
             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the panel
           >
             <h2
