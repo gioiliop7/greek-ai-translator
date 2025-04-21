@@ -33,8 +33,8 @@ services:
       # If you use fetch, you need to change it in the fetch URL
       - OLLAMA_HOST=http://ollama:11434
 
-      # You can pass other env vars if needed
-      # - SOME_OTHER_VAR=value
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL} 
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN} 
 
     # Connects the service to the shared network
     networks:
