@@ -12,3 +12,7 @@ export interface TranslationHistoryItem {
   provider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT";
   timestamp: number;
 }
+
+export interface DisclaimerProps {
+  darkMode: boolean;
+}

@@ -18,6 +18,7 @@ import {
   MessageCircle, // For feedback (placeholder)
 } from "lucide-react";
 import { Window, TranslationHistoryItem } from "@/helpers/types";
+import Disclaimer from "@/components/Disclaimer";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -1099,6 +1100,7 @@ export default function Home() {
             </span>
           )}
         </p>
+        <Disclaimer darkMode={darkMode} />
         <p
           className={`text-center ${
             darkMode ? "text-gray-500" : "text-gray-600"
