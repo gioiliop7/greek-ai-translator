@@ -41,25 +41,38 @@ export default function Home() {
   const [isListening, setIsListening] = useState(false); // <-- New state for listening status
   const recognitionRef = useRef<SpeechRecognition | null>(null); // <-- Ref for SpeechRecognition API
   const inputTextAreaRef = useRef<HTMLTextAreaElement>(null); // <-- Ref for input textarea (for drag/drop)
+  // Add states for history search and filter
+  const [historySearchQuery, setHistorySearchQuery] = useState(""); // State for the search input text
+  const [historyFilter, setHistoryFilter] = useState<"all" | "favorites">(
+    "all"
+  ); // State for the filter (show all or only favorites)
 
   // 1. History with localStorage
   useEffect(() => {
-    // Load history from localStorage when page loads
+    // Load history from localStorage on component mount
     const savedHistory = localStorage.getItem("translationHistory");
     if (savedHistory) {
       try {
-        // Try to parse and set history
-        const parsedHistory = JSON.parse(savedHistory);
-        // Optional check if data is in correct format
-        if (Array.isArray(parsedHistory)) {
-          setHistory(parsedHistory);
-        }
+        // Parse the JSON string into an array of history items
+        const parsedHistory: TranslationHistoryItem[] =
+          JSON.parse(savedHistory);
+
+        // Map over the parsed history to ensure the 'isFavorite' property exists
+        // This handles loading old history items saved before 'isFavorite' was added
+        const historyWithFavorites = parsedHistory.map((item) => ({
+          ...item, // Copy existing properties
+          isFavorite: item.isFavorite ?? false, // Use existing isFavorite or default to false if undefined/null
+        }));
+
+        setHistory(historyWithFavorites); // Update the history state
       } catch (e) {
-        console.error("Failed to load history from localStorage:", e);
-        // You can inform the user or just start with empty history
+        console.error("Failed to parse history from localStorage", e);
+        // Clear potentially corrupted history if parsing fails
+        localStorage.removeItem("translationHistory");
       }
     }
-  }, []); // useEffect runs only once on initial load
+    // No dependencies needed, runs only once on mount
+  }, []); // Empty dependency array
 
   useEffect(() => {
     // Save history to localStorage whenever it changes
@@ -267,6 +280,23 @@ export default function Home() {
     return () => {}; // Return empty function for cleanup if inputArea not found
   }, [darkMode]); // Re-run if darkMode changes for border classes
 
+  // --- Derived State for Filtered History ---
+  // This state is computed whenever history, search query, or filter changes
+  const filteredHistory = history.filter((item) => {
+    // Filter by search query (case-insensitive, check input text)
+    const matchesSearch = item.input
+      .toLowerCase()
+      .includes(historySearchQuery.toLowerCase());
+
+    // Filter by favorite status
+    const matchesFilter =
+      historyFilter === "all" ||
+      (historyFilter === "favorites" && item.isFavorite);
+
+    // An item is included if it matches both search and filter
+    return matchesSearch && matchesFilter;
+  });
+
   const handleTranslate = async () => {
     if (!text.trim()) {
       setError("Please enter text for translation.");
@@ -401,6 +431,7 @@ export default function Home() {
           direction: historyDirection,
           provider: historyProvider,
           timestamp: Date.now(), // Add timestamp
+          isFavorite: false,
         },
         ...prev.slice(0, 9), // Keep only last 10 translations
       ]);
@@ -420,6 +451,18 @@ export default function Home() {
       setLoading(false);
       // Cleanup is handled by the useEffect cleanup function for SpeechRecognition
     }
+  };
+
+  // Function to toggle the favorite status of a history item
+  const toggleFavorite = (timestamp: number) => {
+    setHistory((prevHistory) =>
+      prevHistory.map((item) =>
+        item.timestamp === timestamp
+          ? { ...item, isFavorite: !item.isFavorite }
+          : item
+      )
+    );
+    // The useEffect that saves history will automatically save the updated state
   };
 
   const toggleDirection = () => {
@@ -1109,109 +1152,217 @@ export default function Home() {
           Giorgos Iliopoulos © {new Date().getFullYear()}
         </p>
       </div>
-
       {/* History Panel */}
+      {/* History Panel (Visible when showHistory is true) */}
       {showHistory && (
         <div
-          className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6`}
+          className={`fixed inset-0 ${
+            darkMode ? "bg-black/60" : "bg-black/40"
+          } flex justify-center items-center z-50`}
+          onClick={() => setShowHistory(false)}
         >
           <div
-            className={`w-full max-w-3xl ${cardClasses} rounded-3xl shadow-2xl border p-6 space-y-6 overflow-hidden`}
+            className={`relative ${cardClasses} rounded-lg shadow-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto transition-colors duration-300`}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the panel
           >
-            <div className="flex justify-between items-center">
-              <h2
-                className={`text-2xl font-bold ${
-                  darkMode ? "text-white" : "text-gray-800"
+            <h2
+              className={`text-2xl font-bold mb-4 ${
+                darkMode ? "text-gray-200" : "text-gray-800"
+              }`}
+            >
+              Ιστορικό Μεταφράσεων
+            </h2>
+
+            {/* --- History Search and Filter --- */}
+            <div className="mb-4 space-y-4">
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Αναζήτηση στο κείμενο εισόδου..."
+                value={historySearchQuery}
+                onChange={(e) => setHistorySearchQuery(e.target.value)}
+                className={`w-full px-4 py-2 border rounded-md ${inputBgClasses} ${
+                  darkMode
+                    ? "text-gray-200 border-gray-600 placeholder-gray-500"
+                    : "text-gray-800 border-gray-300 placeholder-gray-400"
                 }`}
-              >
-                Ιστορικό Μεταφράσεων
-              </h2>
-              <button
-                onClick={() => setShowHistory(false)}
-                className={`px-4 py-2 ${secondaryButtonClasses} rounded-lg`}
-              >
-                Κλείσιμο
-              </button>
+              />
+
+              {/* Filter Options */}
+              <div className="flex items-center gap-4 text-sm">
+                <span className={darkMode ? "text-gray-300" : "text-gray-700"}>
+                  Φίλτρο:
+                </span>
+                <label
+                  className={`flex items-center cursor-pointer ${
+                    darkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="historyFilter"
+                    value="all"
+                    checked={historyFilter === "all"}
+                    onChange={() => setHistoryFilter("all")}
+                    className={`form-radio h-4 w-4 mr-1 accent-blue-500`}
+                  />{" "}
+                  Όλα
+                </label>
+                <label
+                  className={`flex items-center cursor-pointer ${
+                    darkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="historyFilter"
+                    value="favorites"
+                    checked={historyFilter === "favorites"}
+                    onChange={() => setHistoryFilter("favorites")}
+                    className={`form-radio h-4 w-4 mr-1 accent-yellow-500`}
+                  />{" "}
+                  Αγαπημένα
+                </label>
+              </div>
             </div>
+            {/* --- End History Search and Filter --- */}
 
-            {history.length > 0 ? (
-              <>
-                <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
-                  {history.map((item, index) => (
-                    <div
-                      key={index}
-                      className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${
+            {/* History List */}
+            {filteredHistory.length > 0 ? ( // Use filteredHistory here
+              <ul className="space-y-4">
+                {filteredHistory.map(
+                  (
+                    item // Use filteredHistory here
+                  ) => (
+                    <li
+                      key={item.timestamp} // Unique key for list items
+                      className={`p-4 rounded-md border ${
                         darkMode
-                          ? "bg-gray-700/70 border-gray-600 hover:bg-gray-700"
-                          : "bg-gray-100 border-gray-200 hover:bg-gray-200"
-                      }`}
-                      onClick={() => loadFromHistory(item)}
+                          ? "border-gray-700 bg-gray-800"
+                          : "border-gray-300 bg-gray-100"
+                      } transition-colors duration-200`}
                     >
-                      <div className="flex justify-between items-center mb-2">
-                        <span
-                          className={`text-sm font-medium ${
-                            darkMode ? "text-blue-300" : "text-blue-600"
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 mr-4">
+                          <p
+                            className={`text-xs ${
+                              darkMode ? "text-gray-400" : "text-gray-600"
+                            } mb-1`}
+                          >
+                            {new Date(item.timestamp).toLocaleString()} -{" "}
+                            {item.provider} - {item.direction}
+                          </p>
+                          <p
+                            className={`${
+                              darkMode ? "text-gray-200" : "text-gray-800"
+                            } font-medium`}
+                          >
+                            {item.input.substring(0, 100)}
+                            {item.input.length > 100 ? "..." : ""}{" "}
+                            {/* Show truncated input */}
+                          </p>
+                        </div>
+                        {/* --- Favorite Button --- */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(item.timestamp);
+                          }} // Stop propagation to prevent loading item
+                          className={`p-1 rounded-full transition-colors duration-200 ${
+                            item.isFavorite
+                              ? "text-yellow-500 hover:bg-yellow-500/20" // Favorite state color
+                              : `${
+                                  darkMode
+                                    ? "text-gray-500 hover:text-yellow-500 hover:bg-gray-700"
+                                    : "text-gray-400 hover:text-yellow-600 hover:bg-gray-200"
+                                }` // Not favorite state color
                           }`}
+                          title={
+                            item.isFavorite
+                              ? "Remove from favorites"
+                              : "Add to favorites"
+                          }
                         >
-                          {item.direction}
-                        </span>
-                        <span
-                          className={`text-xs ${
-                            darkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          {item.provider}
-                        </span>
+                          {/* Use a star icon, filled if favorite, outline if not */}
+                          {item.isFavorite ? (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              className="w-5 h-5"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.106 21.26c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              strokeWidth={1.5}
+                              stroke="currentColor"
+                              className="w-5 h-5"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557L3.396 9.28a.562.562 0 0 1-.322-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"
+                              />
+                            </svg>
+                          )}
+                        </button>
                       </div>
-                      <p
-                        className={`text-sm ${
-                          darkMode ? "text-gray-300" : "text-gray-700"
-                        } mb-1 whitespace-pre-wrap break-words max-h-12 overflow-hidden text-ellipsis`} // Added styles to better handle long input
+                      <button
+                        onClick={() => loadFromHistory(item)}
+                        className={`w-full text-left ${
+                          darkMode
+                            ? "text-gray-300 hover:text-blue-400"
+                            : "text-gray-700 hover:text-blue-600"
+                        } transition-colors duration-200 text-sm`}
                       >
-                        {item.input}
-                      </p>
-                      <div
-                        className={`text-sm ${
-                          darkMode ? "text-gray-400" : "text-gray-500"
-                        } mt-1 whitespace-pre-wrap break-words max-h-12 overflow-hidden text-ellipsis`} // Added styles to better handle long output
-                      >
-                        {item.output}
-                      </div>
-                      {/* Optional: Display timestamp */}
-                      {item.timestamp && (
-                        <span
-                          className={`block text-right text-xs ${
-                            darkMode ? "text-gray-500" : "text-gray-400"
-                          } mt-1`}
-                        >
-                          {new Date(item.timestamp).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={clearHistory}
-                    className={`px-4 py-2 ${secondaryButtonClasses} rounded-lg text-sm`}
-                  >
-                    Καθαρισμός Ιστορικού
-                  </button>
-                </div>
-              </>
+                        {item.output.substring(0, 100)}
+                        {item.output.length > 100 ? "..." : ""}{" "}
+                        {/* Show truncated output */}
+                      </button>
+                    </li>
+                  )
+                )}
+              </ul>
             ) : (
-              <p
-                className={`text-center py-10 ${
-                  darkMode ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                Δεν υπάρχουν αποθηκευμένες μεταφράσεις.
+              <p className={darkMode ? "text-gray-400" : "text-gray-600"}>
+                {history.length > 0
+                  ? "No results found for your search/filter."
+                  : "Το ιστορικό είναι άδειο."}{" "}
+                {/* Message if history is empty or filter/search yields no results */}
               </p>
             )}
+
+            {/* Clear History Button */}
+            {history.length > 0 && (
+              <button
+                onClick={clearHistory}
+                className={`${secondaryButtonClasses} mt-4 w-full flex items-center justify-center p-3 rounded-md`}
+              >
+                <History size={18} className="mr-2" />
+                Εκκαθάριση Ιστορικού
+              </button>
+            )}
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowHistory(false)}
+              className="absolute top-2 right-2 p-2 rounded-full hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}
+      {/* End of showHistory block */}
     </main>
   );
 }

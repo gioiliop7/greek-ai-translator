@@ -6,11 +6,12 @@ export interface Window {
   SpeechRecognitionEvent: typeof SpeechRecognitionEvent;
 }
 export interface TranslationHistoryItem {
-  input: string;
-  output: string;
-  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα";
-  provider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT";
-  timestamp: number;
+  input: string; // The original input text
+  output: string; // The translated output text
+  direction: "Νέα → Αρχαία" | "Αρχαία → Νέα"; // The translation direction
+  provider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT"; // The AI provider used
+  timestamp: number; // Timestamp of the translation for sorting/identification
+  isFavorite: boolean; // <-- Add this property for marking as favorite
 }
 
 export interface DisclaimerProps {
