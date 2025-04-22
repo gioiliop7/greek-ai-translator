@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Window, TranslationHistoryItem } from "@/helpers/types";
 import Disclaimer from "@/components/Disclaimer";
+import { getThemeClasses } from "@/helpers/themeClasses";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -89,7 +90,6 @@ export default function Home() {
     setCharacterCount(text.length);
   }, [text]);
 
-  // 6. Disable Ollama in Production
   const isProduction = process.env.NODE_ENV === "production";
   useEffect(() => {
     if (isProduction && provider === "ollama") {
@@ -100,8 +100,6 @@ export default function Home() {
     }
   }, [isProduction, provider]); // Checks when environment or provider changes
 
-  // 3. Speech-to-Text (Voice Input)
-  // --- 3. Speech-to-Text (Voice Input) ---
   useEffect(() => {
     // Check for Web Speech API support
     // Accessing SpeechRecognition via window requires checking if window is defined (for SSR safety)
@@ -202,7 +200,6 @@ export default function Home() {
     }
   };
 
-  // 10. Drag and Drop (for .txt files)
   useEffect(() => {
     const inputArea = inputTextAreaRef.current?.parentElement; // Connect drag/drop to container
 
@@ -480,7 +477,6 @@ export default function Home() {
     setError(null);
   };
 
-  // 2. Input Text Clear Button
   const clearInputText = () => {
     setText("");
     setTranslated(""); // Clear translation too
@@ -573,34 +569,15 @@ export default function Home() {
       ? "Μετάφραση (Αρχαία Ελληνικά)"
       : "Μετάφραση (Νέα Ελληνικά)";
 
-  // Dynamic theme classes
-  const themeClasses = darkMode
-    ? "bg-gradient-to-br from-gray-900 to-black text-white"
-    : "bg-gradient-to-br from-blue-50 to-white text-gray-900";
-
-  const cardClasses = darkMode
-    ? "bg-gray-800/50 backdrop-blur-lg border-gray-700"
-    : "bg-white/70 backdrop-blur-lg border-gray-200";
-
-  const inputBgClasses = darkMode
-    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-500"
-    : "bg-gray-100/80 border-gray-300 text-gray-800 placeholder-gray-400";
-
-  const buttonGradient = darkMode
-    ? "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
-    : "bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600";
-
-  const secondaryButtonClasses = darkMode
-    ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-    : "bg-gray-200 hover:bg-gray-300 text-gray-700";
-
-  const tooltipClasses = darkMode
-    ? "bg-gray-700 text-white"
-    : "bg-gray-100 text-gray-800";
-
-  const actionButtonClasses = darkMode
-    ? "bg-blue-600/20 hover:bg-blue-500/30 text-blue-400 border-blue-700/30"
-    : "bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200";
+  const {
+    themeClasses,
+    cardClasses,
+    inputBgClasses,
+    buttonGradient,
+    secondaryButtonClasses,
+    tooltipClasses,
+    actionButtonClasses,
+  } = getThemeClasses(darkMode);
 
   return (
     <main
@@ -1152,8 +1129,7 @@ export default function Home() {
           Giorgos Iliopoulos © {new Date().getFullYear()}
         </p>
       </div>
-      {/* History Panel */}
-      {/* History Panel (Visible when showHistory is true) */}
+
       {showHistory && (
         <div
           className={`fixed inset-0 ${
@@ -1362,7 +1338,6 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* End of showHistory block */}
     </main>
   );
 }
