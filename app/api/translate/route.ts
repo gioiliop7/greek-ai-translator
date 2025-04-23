@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  const { text, direction } = await req.json();
+  const { text, direction,modernStyle } = await req.json();
 
-  let directionPrompt = "";
+  // Validate direction and determine language roles
+  let sourceLang = "";
+  let targetLang = "";
+  let directionInstruction = ""; // Instruction for the model regarding direction and style
+
   if (direction === "modern-to-ancient") {
-    directionPrompt = "from modern to ancient greek";
+    sourceLang = (modernStyle === "katharevousa") ? "Καθαρεύουσα (Modern Greek formal style)" : "Νέα Ελληνικά (Modern Greek standard style)";
+    targetLang = "Αρχαία Ελληνικά (Ancient Greek)";
+    directionInstruction = `Translate the following text from ${sourceLang} to ${targetLang}.`;
   } else if (direction === "ancient-to-modern") {
-    directionPrompt = "from ancient to modern greek";
+    sourceLang = "Αρχαία Ελληνικά (Ancient Greek)";
+     targetLang = (modernStyle === "katharevousa") ? "Καθαρεύουσα (Modern Greek formal style)" : "Νέα Ελληνικά (Modern Greek standard style)";
+     directionInstruction = `Translate the following text from ${sourceLang} to ${targetLang}.`;
   } else {
     console.error("Invalid direction received:", direction);
     return NextResponse.json(
@@ -16,7 +24,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const prompt = `Translate ${directionPrompt}. Send only the translation. Text to translate is this":${text}"`;
+  const prompt = `${directionInstruction} Provide ONLY the translation and nothing else. The text to translate is this: "${text}"`;
   console.log(prompt);
 
   try {

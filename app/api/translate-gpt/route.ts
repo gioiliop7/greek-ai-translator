@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   // they have already executed before the request reaches here.
 
   try {
-    const { text, direction } = await request.json();
+    const { text, direction, modernStyle } = await request.json();
 
     // Basic validation for request body
     if (!text || !direction) {
@@ -44,14 +44,30 @@ export async function POST(request: Request) {
         "You are a highly accurate Greek language translator. Translate the provided text precisely according to the user's specified direction.Provide ONLY the translation and nothing else.",
     };
 
+    let userContent = "";
+
+    if (direction === "modern-to-ancient") {
+      // Modify user message based on modernStyle when translating FROM Modern Greek
+      userContent =
+        modernStyle === "katharevousa"
+          ? `Translate this text from Katharevousa (Modern Greek formal style) to Ancient Greek:\n\n${text}`
+          : `Translate this text from Modern Greek (standard style) to Ancient Greek:\n\n${text}`;
+    } else if (direction === "ancient-to-modern") {
+      userContent =
+        modernStyle === "katharevousa"
+          ? `Translate this text from Ancient Greek to Katharevousa (Modern Greek formal style):\n\n${text}`
+          : `Translate this text from Ancient Greek to Modern Greek (standard style):\n\n${text}`;
+    } else {
+      // This case should ideally be caught by the frontend or handled by middleware validation
+      console.error("Invalid direction received for OpenAI:", direction);
+      return NextResponse.json(
+        { error: "Invalid translation direction provided." },
+        { status: 400 }
+      );
+    }
+
     // Define the user message containing the text to translate and the specific direction request
-    const userMessage = {
-      role: "user",
-      content:
-        direction === "modern-to-ancient"
-          ? `Translate this Modern Greek text to Ancient Greek:\n\n${text}`
-          : `Translate this Ancient Greek text to Modern Greek:\n\n${text}`,
-    };
+    const userMessage = { role: "user", content: userContent };
 
     // Construct the messages array for the Chat Completions API
     const messages = [systemMessage, userMessage];
@@ -88,7 +104,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (e) {
-        console.log(e)
+        console.log(e);
         // Ignore JSON parsing error if the body is not valid JSON
       }
 

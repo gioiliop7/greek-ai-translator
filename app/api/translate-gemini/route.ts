@@ -18,23 +18,37 @@ export async function POST(req: Request) {
     );
   }
 
-  const { text, direction } = await req.json();
+  const { text, direction, modernStyle } = await req.json();
   console.log("Gemini Translate Request - Direction:", direction);
 
-  let directionPrompt = "";
+  let sourceLang = "";
+  let targetLang = "";
+  let directionInstruction = ""; // Instruction for the model regarding direction and style
+
   if (direction === "modern-to-ancient") {
-    directionPrompt = "από νέα ελληνικά σε αρχαία ελληνικά";
+    sourceLang =
+      modernStyle === "katharevousa"
+        ? "Καθαρεύουσα (Modern Greek formal style)"
+        : "Νέα Ελληνικά (Modern Greek standard style)";
+    targetLang = "Αρχαία Ελληνικά (Ancient Greek)";
+    directionInstruction = `Translate the following text from ${sourceLang} to ${targetLang}.`;
   } else if (direction === "ancient-to-modern") {
-    directionPrompt = "από αρχαία ελληνικά σε νέα ελληνικά";
+    sourceLang = "Αρχαία Ελληνικά (Ancient Greek)";
+    targetLang =
+      modernStyle === "katharevousa"
+        ? "Καθαρεύουσα (Modern Greek formal style)"
+        : "Νέα Ελληνικά (Modern Greek standard style)";
+    directionInstruction = `Translate the following text from ${sourceLang} to ${targetLang}.`;
   } else {
-    console.error("Invalid direction received by Gemini route:", direction);
+    console.error("Invalid direction received by Gemini route:", direction); // Keep your existing error log
     return NextResponse.json(
+      // Keep your existing error response
       { error: "Invalid translation direction provided." },
       { status: 400 }
     );
   }
 
-  const prompt = `Είσαι ένας εξειδικευμένος μεταφραστής. Μετάφρασε το παρακάτω κείμενο ${directionPrompt}. Δώσε μόνο τη μετάφραση και τίποτα άλλο, χωρίς επιπλέον σχόλια ή επεξηγήσεις.\n\nΚείμενο προς μετάφραση:\n${text}\n\nΜετάφραση:`;
+  const prompt = `${directionInstruction} Provide ONLY the translation and nothing else. Do not include any conversational text, explanations, or additional formatting. The text to translate is this: "${text}"`;
 
   try {
     const result = await model.generateContentStream(prompt);

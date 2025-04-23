@@ -47,6 +47,9 @@ export default function Home() {
   const [historyFilter, setHistoryFilter] = useState<"all" | "favorites">(
     "all"
   ); // State for the filter (show all or only favorites)
+  const [modernStyle, setModernStyle] = useState<"standard" | "katharevousa">(
+    "standard"
+  ); // Default to standard
 
   // 1. History with localStorage
   useEffect(() => {
@@ -63,6 +66,7 @@ export default function Home() {
         const historyWithFavorites = parsedHistory.map((item) => ({
           ...item, // Copy existing properties
           isFavorite: item.isFavorite ?? false, // Use existing isFavorite or default to false if undefined/null
+          modernStyle: item.modernStyle ?? "standard" // <-- Default modernStyle to "standard"
         }));
 
         setHistory(historyWithFavorites); // Update the history state
@@ -333,7 +337,7 @@ export default function Home() {
       const res = await fetch(apiRoute, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, direction }),
+        body: JSON.stringify({ text, direction, modernStyle }),
       });
 
       if (!res.ok) {
@@ -429,6 +433,7 @@ export default function Home() {
           provider: historyProvider,
           timestamp: Date.now(), // Add timestamp
           isFavorite: false,
+          modernStyle: modernStyle,
         },
         ...prev.slice(0, 9), // Keep only last 10 translations
       ]);
@@ -547,6 +552,7 @@ export default function Home() {
         | "chatgpt"
     );
     setShowHistory(false);
+    setModernStyle(item.modernStyle ?? "standard"); // <-- Restore modernStyle, default to "standard"
     setError(null); // Clear errors
   };
 
@@ -785,6 +791,65 @@ export default function Home() {
               </label>
             </div>
           </div>
+          {/* --- Modern Greek Style Selector (New UI Block) --- */}
+          {/* Show this selector ONLY when the direction involves Modern Greek */}
+          {(direction === "modern-to-ancient" ||
+            direction === "ancient-to-modern") && (
+            <div className="flex items-center justify-center gap-6 mb-6">
+              <span
+                className={`text-lg font-semibold ${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                Style Νέων:
+              </span>
+              <div className="flex items-center gap-6">
+                {/* Standard Style Option */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    id="style-standard"
+                    name="modernStyle"
+                    value="standard"
+                    checked={modernStyle === "standard"}
+                    onChange={() => setModernStyle("standard")}
+                    className={`form-radio h-5 w-5 accent-blue-500`} // Use a distinct accent color
+                    disabled={loading}
+                  />
+                  <label
+                    htmlFor="style-standard"
+                    className={`flex items-center ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } cursor-pointer`}
+                  >
+                    <span>Standard</span>
+                  </label>
+                </div>
+                {/* Katharevousa Style Option */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    id="style-katharevousa"
+                    name="modernStyle"
+                    value="katharevousa"
+                    checked={modernStyle === "katharevousa"}
+                    onChange={() => setModernStyle("katharevousa")}
+                    className={`form-radio h-5 w-5 accent-purple-500`} // Use a distinct accent color
+                    disabled={loading}
+                  />
+                  <label
+                    htmlFor="style-katharevousa"
+                    className={`flex items-center ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } cursor-pointer`}
+                  >
+                    <span>Καθαρεύουσα</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* --- End Modern Greek Style Selector --- */}
         </div>
 
         {/* Direction Toggle */}

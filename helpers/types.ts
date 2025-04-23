@@ -12,6 +12,8 @@ export interface TranslationHistoryItem {
   provider: "Ollama" | "Gemini" | "DeepSeek" | "ChatGPT"; // The AI provider used
   timestamp: number; // Timestamp of the translation for sorting/identification
   isFavorite: boolean; // <-- Add this property for marking as favorite
+  modernStyle?: "standard" | "katharevousa"; // <-- Add this property (optional for old history)
+
 }
 
 export interface DisclaimerProps {

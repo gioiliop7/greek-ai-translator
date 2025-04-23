@@ -6,7 +6,7 @@ const DEEPSEEK_MODEL = "deepseek-chat";
 
 export async function POST(request: Request) {
   try {
-    const { text, direction } = await request.json();
+    const { text, direction, modernStyle } = await request.json();
 
     if (!text || !direction) {
       return NextResponse.json(
@@ -24,19 +24,32 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+    let systemContent =
+      "You are a highly accurate Greek language translator. Translate the provided text precisely according to the user's specified direction and style. Provide ONLY the translation and nothing else."; // Updated system message slightly
+
+    let userContent = "";
+
+    if (direction === "modern-to-ancient") {
+      userContent =
+        modernStyle === "katharevousa"
+          ? `Translate this text from Katharevousa (Modern Greek formal style) to Ancient Greek:\n\n${text}`
+          : `Translate this text from Modern Greek (standard style) to Ancient Greek:\n\n${text}`;
+    } else if (direction === "ancient-to-modern") {
+      userContent =
+        modernStyle === "katharevousa"
+          ? `Translate this text from Ancient Greek to Katharevousa (Modern Greek formal style):\n\n${text}`
+          : `Translate this text from Ancient Greek to Modern Greek (standard style):\n\n${text}`;
+    } else {
+      console.error("Invalid direction received for DeepSeek:", direction);
+      return NextResponse.json(
+        { error: "Invalid translation direction provided." },
+        { status: 400 }
+      );
+    }
+
     const messages = [
-      {
-        role: "system",
-        content:
-          "You are a highly accurate Greek language translator. Translate between Modern Greek and Ancient Greek.",
-      },
-      {
-        role: "user",
-        content:
-          direction === "modern-to-ancient"
-            ? `Translate the following Modern Greek text to Ancient Greek:\n\n${text}. Send only the translated text.`
-            : `Translate the following Ancient Greek text to Modern Greek:\n\n${text}. Send only the translated text`,
-      },
+      { role: "system", content: systemContent },
+      { role: "user", content: userContent },
     ];
 
     const apiResponse = await fetch(DEEPSEEK_API_URL, {
