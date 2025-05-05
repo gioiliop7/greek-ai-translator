@@ -35,6 +35,32 @@ const ratelimit = new Ratelimit({
   timeout: 5000, // Optional: Timeout for Redis calls (in ms)
 });
 
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+
+async function verifyRecaptcha(token: string | null): Promise<boolean> {
+  if (!token) {
+    return false;
+  }
+
+  const verificationUrl = `https://www.google.com/recaptcha/api/siteverify`;
+
+  try {
+    const response = await fetch(verificationUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `secret=${RECAPTCHA_SECRET_KEY}&response=${token}`,
+    });
+
+    const data = await response.json();
+    return data.success;
+  } catch (error) {
+    console.error("reCAPTCHA verification failed:", error);
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   // Middleware must be async because of await in ratelimit.limit()
 
@@ -112,6 +138,26 @@ export async function middleware(request: NextRequest) {
       // request.headers.set('X-RateLimit-Remaining', remaining.toString());
       // request.headers.set('X-RateLimit-Reset', reset.toString());
     }
+  }
+
+  // --- 3. Rate Limiting Check ---
+
+  // Extract the reCAPTCHA token from the request.
+  // This assumes the client sends the token in the request body or headers.
+  let token = null;
+
+  try {
+    const body = await request.json();
+    token = body.recaptchaToken;
+  } catch (e) {
+    console.log(e);
+  }
+
+  const isRecaptchaValid = await verifyRecaptcha(token);
+
+  if (!isRecaptchaValid) {
+    // If reCAPTCHA is invalid, return an error response
+    return new NextResponse("reCAPTCHA verification failed", { status: 401 });
   }
 
   // Continue to the next middleware or the route handler if all checks pass
