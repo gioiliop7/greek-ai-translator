@@ -20,6 +20,7 @@ import {
 import { Window, TranslationHistoryItem } from "@/helpers/types";
 import Disclaimer from "@/components/Disclaimer";
 import { getThemeClasses } from "@/helpers/themeClasses";
+import { useReCaptcha } from "next-recaptcha-v3";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -47,6 +48,8 @@ export default function Home() {
   const [historyFilter, setHistoryFilter] = useState<"all" | "favorites">(
     "all"
   ); // State for the filter (show all or only favorites)
+
+  const { executeRecaptcha } = useReCaptcha();
 
   // 1. History with localStorage
   useEffect(() => {
@@ -295,6 +298,8 @@ export default function Home() {
   });
 
   const handleTranslate = async () => {
+    const token = await executeRecaptcha("translation_submission");
+
     if (!text.trim()) {
       setError("Please enter text for translation.");
       return;
@@ -333,7 +338,7 @@ export default function Home() {
       const res = await fetch(apiRoute, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, direction }),
+        body: JSON.stringify({ text, direction, recaptchaToken: token }),
       });
 
       if (!res.ok) {
